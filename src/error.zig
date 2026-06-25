@@ -1,1 +1,1 @@
-pub const ModelViewerError = error{ VertexParseError, FaceParseError };
+pub const ModelViewerError = error{ VertexParseError, FaceParseError, InvalidCanvasSize };

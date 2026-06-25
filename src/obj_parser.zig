@@ -1,9 +1,7 @@
 const std = @import("std");
 const model_mod = @import("model.zig");
-const error_mod = @import("error.zig");
 const Model = model_mod.Model;
 const Vertex = model_mod.Vertex;
-const ModelViewerError = error_mod.ModelViewerError;
 
 const LineParseResult = union(enum) { none: void, vertex_result: Vertex, face_result: []const u32 };
 
@@ -24,7 +22,9 @@ pub fn parseObjFile(allocator: std.mem.Allocator, file_contents: []const u8) !Mo
         }
     }
 
-    return Model{ .verticies = try verticies.toOwnedSlice(allocator), .faces = try faces.toOwnedSlice(allocator) };
+    const model_verticies = try verticies.toOwnedSlice(allocator);
+    const model_faces = try faces.toOwnedSlice(allocator);
+    return Model{ .verticies = model_verticies, .faces = model_faces, .allocator = allocator };
 }
 
 fn parseLine(allocator: std.mem.Allocator, line: []const u8) !LineParseResult {
@@ -52,16 +52,16 @@ fn parseVertex(values: *std.mem.TokenIterator(u8, .scalar)) !Vertex {
     const y = try parseFloatForVertex(values);
     const z = try parseFloatForVertex(values);
 
-    return .{ .x = x, .y = y, .z = z };
+    return .{ x, y, z };
 }
 
 fn parseFloatForVertex(values: *std.mem.TokenIterator(u8, .scalar)) !f32 {
     if (values.next()) |str| {
         return std.fmt.parseFloat(f32, str) catch {
-            return ModelViewerError.VertexParseError;
+            return error.VertexParseError;
         };
     } else {
-        return ModelViewerError.VertexParseError;
+        return error.VertexParseError;
     }
 }
 
@@ -81,10 +81,10 @@ fn parseFaceIndex(str: []const u8) !u32 {
     var face_indecies = std.mem.tokenizeScalar(u8, str, '/');
     if (face_indecies.next()) |vertex_face_index| {
         return std.fmt.parseUnsigned(u32, vertex_face_index, 10) catch {
-            return ModelViewerError.FaceParseError;
+            return error.FaceParseError;
         };
     } else {
-        return ModelViewerError.FaceParseError;
+        return error.FaceParseError;
     }
 }
 
@@ -103,22 +103,22 @@ test "parseObjFile" {
     ;
 
     var model = try parseObjFile(allocator, test_obj);
-    defer model.deinit(allocator);
+    defer model.deinit();
     const tolerance = 0.0001;
 
     try std.testing.expectEqual(@as(usize, 3), model.verticies.len);
 
-    try std.testing.expectApproxEqAbs(@as(f32, 1.5), model.verticies[0].x, tolerance);
-    try std.testing.expectApproxEqAbs(@as(f32, -2.5), model.verticies[0].y, tolerance);
-    try std.testing.expectApproxEqAbs(@as(f32, 0.0), model.verticies[0].z, tolerance);
+    try std.testing.expectApproxEqAbs(@as(f32, 1.5), model.verticies[0][0], tolerance);
+    try std.testing.expectApproxEqAbs(@as(f32, -2.5), model.verticies[0][1], tolerance);
+    try std.testing.expectApproxEqAbs(@as(f32, 0.0), model.verticies[0][2], tolerance);
 
-    try std.testing.expectApproxEqAbs(@as(f32, 3.0), model.verticies[1].x, tolerance);
-    try std.testing.expectApproxEqAbs(@as(f32, 4.0), model.verticies[1].y, tolerance);
-    try std.testing.expectApproxEqAbs(@as(f32, 5.01), model.verticies[1].z, tolerance);
+    try std.testing.expectApproxEqAbs(@as(f32, 3.0), model.verticies[1][0], tolerance);
+    try std.testing.expectApproxEqAbs(@as(f32, 4.0), model.verticies[1][1], tolerance);
+    try std.testing.expectApproxEqAbs(@as(f32, 5.01), model.verticies[1][2], tolerance);
 
-    try std.testing.expectApproxEqAbs(@as(f32, 4.0), model.verticies[2].x, tolerance);
-    try std.testing.expectApproxEqAbs(@as(f32, 5.0), model.verticies[2].y, tolerance);
-    try std.testing.expectApproxEqAbs(@as(f32, 6.0), model.verticies[2].z, tolerance);
+    try std.testing.expectApproxEqAbs(@as(f32, 4.0), model.verticies[2][0], tolerance);
+    try std.testing.expectApproxEqAbs(@as(f32, 5.0), model.verticies[2][1], tolerance);
+    try std.testing.expectApproxEqAbs(@as(f32, 6.0), model.verticies[2][2], tolerance);
 
     try std.testing.expectEqual(@as(usize, 1), model.faces.len);
     try std.testing.expectEqualSlices(u32, &[_]u32{ 1, 2, 3 }, model.faces[0]);
