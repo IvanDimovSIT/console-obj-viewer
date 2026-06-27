@@ -11,18 +11,42 @@ scale: f32 = 1.0,
 
 pub fn fitScale(self: *Self, model: *const Model) void {
     const bb = transformations.findBoundingBox(model) orelse return;
-    const size = @max(-bb.max, bb.max) + @max(-bb.min, bb.min);
+    const size = @abs(bb.max) + @abs(bb.min);
 
     self.scale = @max(size[0], size[1], size[2]);
 }
 
 pub fn render(self: Self, model: *const Model, canvas: *const Canvas, io: std.Io) !void {
-    for (model.verticies) |v| {
-        const point_x = 0.5 + v[0] / ((v[1] + self.scale) * self.scale);
-        const point_y = 0.5 + v[2] / ((v[1] + self.scale) * self.scale);
-        std.log.debug("Drawing x:{} y:{}", .{ point_x, point_y });
-        canvas.drawPoint(point_x, point_y);
+    canvas.clear();
+    for (model.faces) |face| {
+        self.renderFace(face, model.verticies, canvas);
     }
 
     try canvas.display(io);
+}
+
+fn renderFace(self: Self, face: []const u32, verticies: []const Vertex, canvas: *const Canvas) void {
+    if (face.len <= 1) {
+        return;
+    }
+
+    for (face[0..(face.len - 1)], face[1..]) |vertex_index1, vertex_index2| {
+        const vertex1 = verticies[vertex_index1 - 1];
+        const vertex2 = verticies[vertex_index2 - 1];
+        self.drawEdge(vertex1, vertex2, canvas);
+    }
+    const vertex1 = verticies[face[0] - 1];
+    const vertex2 = verticies[face[face.len - 1] - 1];
+    self.drawEdge(vertex1, vertex2, canvas);
+}
+
+fn drawEdge(self: Self, start: Vertex, end: Vertex, canvas: *const Canvas) void {
+    const start_x = 0.5 + start[0] / ((self.scale - start[1]) * self.scale);
+    const start_y = 0.5 + start[2] / ((self.scale - start[1]) * self.scale);
+    const end_x = 0.5 + end[0] / ((self.scale - end[1]) * self.scale);
+    const end_y = 0.5 + end[2] / ((self.scale - end[1]) * self.scale);
+
+    canvas.drawLine(start_x, start_y, end_x, end_y, '*');
+    canvas.drawPoint(start_x, start_y, '*');
+    canvas.drawPoint(end_x, end_y, '*');
 }

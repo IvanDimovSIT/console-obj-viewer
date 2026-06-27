@@ -9,7 +9,7 @@ const obj_parser_mod = @import("obj_parser.zig");
 pub fn main(init: std.process.Init) !void {
     const io = init.io;
     const gpa = init.gpa;
-    const test_file_name = "cube.obj";
+    const test_file_name = "test_model.obj";
     const test_file_contents = try readFile(io, gpa, test_file_name);
     defer gpa.free(test_file_contents);
 
@@ -19,11 +19,20 @@ pub fn main(init: std.process.Init) !void {
     transformations.moveModelToOrigin(&model);
     std.log.debug("Moved:\n{}", .{model});
 
-    var canvas = try Canvas.init(gpa, 16);
+    var canvas = try Canvas.init(gpa, 32);
     defer canvas.deinit();
+    canvas.drawLine(0.1, 0.1, 0.9, 0.3, null);
+    try canvas.display(io);
+    canvas.clear();
 
     var renderer: WireframeRenderer = .{};
     renderer.fitScale(&model);
+    try renderer.render(&model, &canvas, io);
+
+    transformations.rotateModelAroundOrigin(&model, 0.0, 0.0, 0.8);
+    try renderer.render(&model, &canvas, io);
+
+    transformations.rotateModelAroundOrigin(&model, 0.0, 0.0, 0.7);
     try renderer.render(&model, &canvas, io);
 }
 
