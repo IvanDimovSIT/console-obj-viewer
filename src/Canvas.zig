@@ -51,14 +51,15 @@ pub fn drawLine(self: Self, x1: f32, y1: f32, x2: f32, y2: f32, protected: ?u8) 
 
     var err = dx + dy;
 
+    const line_char = determineLineChar(x, y, target_x, target_y);
     while (true) {
         std.debug.assert(x >= 0);
         std.debug.assert(y >= 0);
         const index = x + y * self.size;
         std.debug.assert(index >= 0);
         std.debug.assert(index < @as(i32, self.size) * @as(i32, self.size));
+
         if (protected == null or self.array[@intCast(index)] != protected.?) {
-            const line_char = determineLineChar(prev_x, prev_y, x, y);
             self.array[@intCast(index)] = line_char;
         }
 
@@ -82,16 +83,30 @@ pub fn drawLine(self: Self, x1: f32, y1: f32, x2: f32, y2: f32, protected: ?u8) 
     }
 }
 
-fn determineLineChar(prev_x: i32, prev_y: i32, x: i32, y: i32) u8 {
-    if (prev_x == x and prev_y != y) {
-        return '|';
-    } else if (prev_x != x and prev_y == y) {
-        return '-';
-    } else if ((prev_x < x and prev_y > y) or (x < prev_x and y > prev_y)) {
-        return '/';
-    } else {
-        return '\\';
+fn determineLineChar(start_x: i32, start_y: i32, end_x: i32, end_y: i32) u8 {
+    const sector_size = std.math.tau / 8.0;
+    const dx: f32 = @floatFromInt(end_x - start_x);
+    const dy: f32 = @floatFromInt(end_y - start_y);
+    var angle = std.math.atan2(dy, dx);
+    angle += sector_size / 2.0;
+    while (angle > std.math.tau) {
+        angle -= std.math.tau;
     }
+    while (angle < 0) {
+        angle += std.math.tau;
+    }
+
+    const sector = @floor(angle / sector_size);
+    if (sector == 0.0 or sector == 4.0) {
+        return '-';
+    } else if (sector == 1.0 or sector == 5.0) {
+        return '\\';
+    } else if (sector == 2.0 or sector == 6.0) {
+        return '|';
+    } else if (sector == 3.0 or sector == 7.0) {
+        return '/';
+    }
+    unreachable;
 }
 
 pub fn display(self: Self, io: std.Io) !void {

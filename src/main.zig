@@ -1,6 +1,7 @@
 const std = @import("std");
 const Io = std.Io;
 const transformations = @import("transformations.zig");
+const input = @import("input.zig");
 const Canvas = @import("Canvas.zig");
 const WireframeRenderer = @import("WireframeRenderer.zig");
 
@@ -27,21 +28,25 @@ pub fn main(init: std.process.Init) !void {
 
     var renderer: WireframeRenderer = .{};
     renderer.fitScale(&model);
-    try renderer.render(&model, &canvas, io);
 
-    transformations.rotateModelAroundOrigin(&model, 0.0, 0.0, 0.8);
-    try renderer.render(&model, &canvas, io);
+    while (true) {
+        try renderer.render(&model, &canvas, io);
 
-    transformations.rotateModelAroundOrigin(&model, 0.0, 0.0, 0.7);
-    try renderer.render(&model, &canvas, io);
+        const char = try input.readChar(io);
+        if (char == 'e') {
+            break;
+        }
+        switch (char) {
+            'd' => transformations.rotateModelAroundOrigin(&model, 0.0, 0.0, 0.1),
+            'a' => transformations.rotateModelAroundOrigin(&model, 0.0, 0.0, -0.1),
+            's' => transformations.rotateModelAroundOrigin(&model, 0.1, 0.0, 0.0),
+            'w' => transformations.rotateModelAroundOrigin(&model, -0.1, 0.0, 0.0),
+            else => {},
+        }
+    }
 }
 
 fn readFile(io: Io, allocator: std.mem.Allocator, file_name: []const u8) ![]const u8 {
     const cwd = Io.Dir.cwd();
     return try cwd.readFileAlloc(io, file_name, allocator, .unlimited);
-}
-
-comptime {
-    _ = @import("obj_parser.zig");
-    _ = @import("Canvas.zig");
 }
