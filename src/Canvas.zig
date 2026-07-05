@@ -1,19 +1,25 @@
 const std = @import("std");
 const Self = @This();
 
-size: u8,
+width: u8,
+height: u8,
+aspect_ratio: f32,
 array: []u8,
 allocator: std.mem.Allocator,
 
-pub fn init(allocator: std.mem.Allocator, size: u8) !Self {
-    if (size < 2) {
+pub fn init(allocator: std.mem.Allocator, width: u8, height: u8) !Self {
+    if (width < 2 or height < 2) {
         return error.InvalidCanvasSize;
     }
 
-    const array = try allocator.alloc(u8, @as(usize, size) * @as(usize, size));
+    const width_f32: f32 = @floatFromInt(width);
+    const height_f32: f32 = @floatFromInt(height);
+    const console_character_aspect_ratio = 2.0;
+    const aspect_ratio = console_character_aspect_ratio / (width_f32 / height_f32);
+    const array = try allocator.alloc(u8, @as(usize, width) * @as(usize, height));
     @memset(array, ' ');
 
-    return .{ .size = size, .allocator = allocator, .array = array };
+    return .{ .width = width, .height = height, .aspect_ratio = aspect_ratio, .allocator = allocator, .array = array };
 }
 
 pub fn deinit(self: Self) void {
@@ -55,9 +61,8 @@ pub fn drawLine(self: Self, x1: f32, y1: f32, x2: f32, y2: f32, protected: ?u8) 
     while (true) {
         std.debug.assert(x >= 0);
         std.debug.assert(y >= 0);
-        const index = x + y * self.size;
+        const index = x + y * self.width;
         std.debug.assert(index >= 0);
-        std.debug.assert(index < @as(i32, self.size) * @as(i32, self.size));
 
         if (protected == null or self.array[@intCast(index)] != protected.?) {
             self.array[@intCast(index)] = line_char;
@@ -115,13 +120,13 @@ pub fn display(self: Self, io: std.Io) !void {
     const stdout_writer = &stdout_file_writer.interface;
 
     var row_n: u32 = 0;
-    while (row_n < self.size) : (row_n += 1) {
-        const start = row_n * @as(u32, self.size);
-        const end = (row_n + 1) * @as(u32, self.size);
+    while (row_n < self.height) : (row_n += 1) {
+        const start = row_n * @as(u32, self.width);
+        const end = (row_n + 1) * @as(u32, self.width);
         const row = self.array[start..end];
         for (row, 0..) |char, index| {
-            if (index + 1 < self.size) {
-                try stdout_writer.print("{c} ", .{char});
+            if (index + 1 < self.width) {
+                try stdout_writer.print("{c}", .{char});
             } else {
                 try stdout_writer.print("{c}\n", .{char});
             }
@@ -133,30 +138,39 @@ pub fn display(self: Self, io: std.Io) !void {
 
 /// x and y must be between 0.0 and 1.0
 fn coordinateToIndex(self: Self, x: f32, y: f32) ?u32 {
-    if (x < 0.0 or x > 1.0 or y < 0.0 or y > 1.0) {
+    const new_x = scalePointOneDimention(x, 0.5, self.aspect_ratio);
+    if (new_x < 0.0 or new_x > 1.0 or y < 0.0 or y > 1.0) {
         return null;
     }
-    const size_f32 = @as(f32, self.size - 1);
-    const x_ind: u32 = @round(x * size_f32);
-    const y_ind: u32 = @round(y * size_f32);
+    const width_f32 = @as(f32, self.width - 1);
+    const height_f32 = @as(f32, self.height - 1);
+    const x_ind: u32 = @round(new_x * width_f32);
+    const y_ind: u32 = @round(y * height_f32);
 
-    return x_ind + y_ind * self.size;
+    return x_ind + y_ind * self.width;
 }
 
 fn coordinateToInts(self: Self, x: f32, y: f32) ?[2]u32 {
-    if (x < 0.0 or x > 1.0 or y < 0.0 or y > 1.0) {
+    const new_x = scalePointOneDimention(x, 0.5, self.aspect_ratio);
+    if (new_x < 0.0 or new_x > 1.0 or y < 0.0 or y > 1.0) {
         return null;
     }
-    const size_f32 = @as(f32, self.size - 1);
-    const x_ind: u32 = @round(x * size_f32);
-    const y_ind: u32 = @round(y * size_f32);
+    const width_f32 = @as(f32, self.width - 1);
+    const height_f32 = @as(f32, self.height - 1);
+    const x_ind: u32 = @round(new_x * width_f32);
+    const y_ind: u32 = @round(y * height_f32);
 
     return .{ x_ind, y_ind };
 }
 
+/// x - point to scale, o - origin
+fn scalePointOneDimention(x: f32, o: f32, scale: f32) f32 {
+    return o + scale * (x - o);
+}
+
 test "canvas" {
     const allocator = std.testing.allocator;
-    var canvas = try Self.init(allocator, 2);
+    var canvas = try Self.init(allocator, 2, 2);
     defer canvas.deinit();
 
     canvas.drawPoint(0.0, 0.0, '*');
