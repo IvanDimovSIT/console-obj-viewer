@@ -1,4 +1,6 @@
 const std = @import("std");
+const builtin = @import("builtin");
+
 const Self = @This();
 
 width: u8,
@@ -38,8 +40,8 @@ pub fn drawPoint(self: Self, x: f32, y: f32, char: u8) void {
 
 /// coordinates must be between 0.0 and 1.0, protected symbol will not be drawn over
 pub fn drawLine(self: Self, x1: f32, y1: f32, x2: f32, y2: f32, protected: ?u8) void {
-    const start = self.coordinateToInts(std.math.clamp(x1, 0.0, 1.0), std.math.clamp(y1, 0.0, 1.0)) orelse return;
-    const end = self.coordinateToInts(std.math.clamp(x2, 0.0, 1.0), std.math.clamp(y2, 0.0, 1.0)) orelse return;
+    const start = self.coordinateToInts(x1, y1) orelse return;
+    const end = self.coordinateToInts(x2, y2) orelse return;
     var x: i32 = @intCast(start[0]);
     var y: i32 = @intCast(start[1]);
     var prev_x: i32 = x;
@@ -115,6 +117,7 @@ fn determineLineChar(start_x: i32, start_y: i32, end_x: i32, end_y: i32) u8 {
 }
 
 pub fn display(self: Self, io: std.Io) !void {
+    clearScreen();
     var stdout_buffer: [1024]u8 = undefined;
     var stdout_file_writer: std.Io.File.Writer = .init(.stdout(), io, &stdout_buffer);
     const stdout_writer = &stdout_file_writer.interface;
@@ -134,6 +137,12 @@ pub fn display(self: Self, io: std.Io) !void {
     }
 
     try stdout_writer.flush();
+}
+
+extern "c" fn system([*]const c_char) c_int;
+fn clearScreen() void {
+    const command = if (builtin.target.os.tag == .windows) "cls" else if (builtin.target.os.tag == .linux) "clear" else return;
+    _ = system(@ptrCast(command));
 }
 
 /// x and y must be between 0.0 and 1.0

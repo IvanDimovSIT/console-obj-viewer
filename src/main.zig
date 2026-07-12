@@ -5,6 +5,7 @@ const input = @import("input.zig");
 const Canvas = @import("Canvas.zig");
 const WireframeRenderer = @import("WireframeRenderer.zig");
 const model_mod = @import("model.zig");
+const Model = model_mod.Model;
 
 const obj_parser_mod = @import("obj_parser.zig");
 
@@ -26,6 +27,9 @@ pub fn main(init: std.process.Init) !void {
 
     var model = try obj_parser_mod.parseObjFile(gpa, model_contents);
     defer model.deinit();
+    const model_copy = try model.dupe();
+    defer model_copy.deinit();
+
     transformations.moveModelToOrigin(&model);
 
     var canvas = try Canvas.init(gpa, width, height);
@@ -33,6 +37,7 @@ pub fn main(init: std.process.Init) !void {
 
     var renderer: WireframeRenderer = .{};
     renderer.fitScale(&model);
+    const original_scale = renderer.scale;
     try printModelInfo(io, model_file_name, &model);
     _ = try input.readChar(io);
 
@@ -51,9 +56,17 @@ pub fn main(init: std.process.Init) !void {
             'w' => transformations.rotateModelAroundOrigin(&model, -rotation_amount, 0.0, 0.0),
             'z' => renderer.scale *= 1.02,
             'x' => renderer.scale *= 0.98,
+            'r' => {
+                resetModel(&model, &model_copy);
+                renderer.scale = original_scale;
+            },
             else => {},
         }
     }
+}
+
+fn resetModel(model: *Model, original: *const Model) void {
+    @memcpy(model.verticies, original.verticies);
 }
 
 /// returns heap allocated file contents with allocator
@@ -73,7 +86,7 @@ fn parseIntOrDefault(str: ?[]const u8, default: u8, message: []const u8) u8 {
     }
 }
 
-fn printModelInfo(io: Io, model_name: []const u8, model: *const model_mod.Model) !void {
+fn printModelInfo(io: Io, model_name: []const u8, model: *const Model) !void {
     var stdout_buffer: [1024]u8 = undefined;
     var stdout_file_writer: std.Io.File.Writer = .init(.stdout(), io, &stdout_buffer);
     const stdout_writer = &stdout_file_writer.interface;
@@ -81,6 +94,7 @@ fn printModelInfo(io: Io, model_name: []const u8, model: *const model_mod.Model)
     try stdout_writer.print("Verticies: {}\n", .{model.verticies.len});
     try stdout_writer.print("Faces: {}\n", .{model.faces.len});
     try stdout_writer.print("Controls:\n * Rotation: w s a d\n * Zoom: z x\n * Exit: e\n", .{});
+    try stdout_writer.print(" * Reset: r\n", .{});
     try stdout_writer.print("Press any key to display ...", .{});
 
     try stdout_writer.flush();
